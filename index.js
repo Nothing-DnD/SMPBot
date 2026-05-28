@@ -3,16 +3,13 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const bedrock = require('bedrock-protocol');
 
-// ====== TOKEN ======
 const TOKEN = process.env.TOKEN;
 
-// ====== SAFETY CHECK ======
 if (!TOKEN) {
-    console.log('❌ TOKEN not found in environment variables');
+    console.log('❌ TOKEN not found');
     process.exit(1);
 }
 
-// ====== DISCORD CLIENT ======
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
@@ -22,25 +19,49 @@ const CHANNEL_ID = '1509520035197222953';
 const SERVER_IP = '95.217.59.237';
 const SERVER_PORT = 10900;
 
-// ====== CACHE ======
+// ====== STATE ======
 let lastName = '';
 let isUpdating = false;
+let failCount = 0;
+let interval;
 
 // ====== READY ======
 client.once('ready', () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 
-    updateServer();
-    setInterval(updateServer, 30000);
+    startLoop();
 });
 
-// ====== BEDROCK PING ======
-async function getServerData() {
-    try {
-        const res = await bedrock.ping({
+// ====== LOOP START ======
+function startLoop() {
+    if (interval) clearInterval(interval);
+
+    interval = setInterval(async () => {
+        await updateServer();
+    }, 30000);
+
+    updateServer();
+}
+
+// ====== SAFE PING WITH TIMEOUT ======
+function pingWithTimeout() {
+    return Promise.race([
+        bedrock.ping({
             host: SERVER_IP,
             port: SERVER_PORT
-        });
+        }),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 5000)
+        )
+    ]);
+}
+
+// ====== GET SERVER DATA ======
+async function getServerData() {
+    try {
+        const res = await pingWithTimeout();
+
+        failCount = 0;
 
         return {
             online: true,
@@ -49,6 +70,10 @@ async function getServerData() {
         };
 
     } catch (err) {
+        failCount++;
+
+        console.log(`⚠️ Ping failed (${failCount}/5):`, err.message);
+
         return {
             online: false,
             players: 0,
@@ -57,7 +82,15 @@ async function getServerData() {
     }
 }
 
-// ====== UPDATE CHANNEL NAME ======
+// ====== WATCHDOG (AUTO RESTART LOGIC) ======
+function checkHealth() {
+    if (failCount >= 5) {
+        console.log('💥 Server lag detected -> restarting bot...');
+        process.exit(1); // Render will auto-restart
+    }
+}
+
+// ====== UPDATE CHANNEL ======
 async function updateServer() {
     if (isUpdating) return;
     isUpdating = true;
@@ -72,13 +105,9 @@ async function updateServer() {
             return;
         }
 
-        let newName;
-
-        if (data.online) {
-            newName = `🟢 Online ${data.players}/${data.max}`;
-        } else {
-            newName = `🔴 Offline`;
-        }
+        let newName = data.online
+            ? `🟢 Online ${data.players}/${data.max}`
+            : `🔴 Offline`;
 
         if (newName !== lastName) {
             await channel.setName(newName);
@@ -86,6 +115,8 @@ async function updateServer() {
 
             console.log(`✅ Updated: ${newName}`);
         }
+
+        checkHealth();
 
     } catch (err) {
         console.log('❌ Update error:', err.message);
