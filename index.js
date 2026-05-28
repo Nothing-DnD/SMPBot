@@ -6,7 +6,7 @@ const app = express();
 const { Client, GatewayIntentBits } = require('discord.js');
 const bedrock = require('bedrock-protocol');
 
-// ===== WEB SERVER FOR RENDER =====
+// ====== RENDER WEB SERVER ======
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
@@ -17,7 +17,7 @@ app.listen(PORT, () => {
     console.log(`🌐 Web server running on port ${PORT}`);
 });
 
-// ===== TOKEN =====
+// ====== TOKEN ======
 const TOKEN = process.env.TOKEN;
 
 console.log('TOKEN EXISTS:', !!TOKEN);
@@ -27,29 +27,29 @@ if (!TOKEN) {
     process.exit(1);
 }
 
-// ===== DISCORD CLIENT =====
+// ====== DISCORD CLIENT ======
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ===== SETTINGS =====
+// ====== SETTINGS ======
 const CHANNEL_ID = '1509520035197222953';
 const SERVER_IP = '95.217.59.237';
 const SERVER_PORT = 10900;
 
-// ===== CACHE =====
+// ====== STATE ======
 let lastName = '';
 let isUpdating = false;
 
-// ===== READY =====
-client.once('clientReady', () => {
+// ====== READY EVENT (FIXED) ======
+client.once('ready', () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 
     updateServer();
     setInterval(updateServer, 30000);
 });
 
-// ===== ERROR HANDLERS =====
+// ====== ERROR HANDLERS ======
 client.on('error', (err) => {
     console.log('❌ Discord error:', err.message);
 });
@@ -58,7 +58,7 @@ client.on('shardError', (err) => {
     console.log('❌ Shard error:', err.message);
 });
 
-// ===== BEDROCK PING =====
+// ====== BEDROCK PING ======
 async function getServerData() {
     try {
         const res = await bedrock.ping({
@@ -83,14 +83,14 @@ async function getServerData() {
     }
 }
 
-// ===== UPDATE CHANNEL =====
+// ====== UPDATE CHANNEL ======
 async function updateServer() {
     if (isUpdating) return;
 
     isUpdating = true;
 
     try {
-        const channel = await client.channels.fetch(CHANNEL_ID);
+        const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
 
         if (!channel) {
             console.log('❌ Channel not found');
@@ -105,7 +105,6 @@ async function updateServer() {
 
         if (newName !== lastName) {
             await channel.setName(newName);
-
             lastName = newName;
 
             console.log(`✅ Updated: ${newName}`);
@@ -113,12 +112,15 @@ async function updateServer() {
 
     } catch (err) {
         console.log('❌ Update error:', err.message);
+
     } finally {
         isUpdating = false;
     }
 }
 
-// ===== LOGIN =====
+// ====== LOGIN (FIXED) ======
+console.log('🚀 Starting Discord login...');
+
 client.login(TOKEN)
     .then(() => {
         console.log('✅ Discord login successful');
