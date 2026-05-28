@@ -1,22 +1,16 @@
 require('dotenv').config();
 
-const express = require('express');
-const app = express();
-
 const { Client, GatewayIntentBits } = require('discord.js');
 const bedrock = require('bedrock-protocol');
 
-// ====== KEEP RENDER ALIVE (FIX WEB SERVICE WARNING) ======
-app.get('/', (req, res) => {
-    res.send('Bot is running');
-});
-
-app.listen(process.env.PORT || 3000, () => {
-    console.log('🌐 Web server started');
-});
-
 // ====== TOKEN ======
 const TOKEN = process.env.TOKEN;
+
+// ====== SAFETY CHECK ======
+if (!TOKEN) {
+    console.log('❌ TOKEN not found in environment variables');
+    process.exit(1);
+}
 
 // ====== DISCORD CLIENT ======
 const client = new Client({
@@ -30,8 +24,9 @@ const SERVER_PORT = 10900;
 
 // ====== CACHE ======
 let lastName = '';
+let isUpdating = false;
 
-// ====== BOT READY ======
+// ====== READY ======
 client.once('ready', () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 
@@ -39,7 +34,7 @@ client.once('ready', () => {
     setInterval(updateServer, 30000);
 });
 
-// ====== GET SERVER STATUS ======
+// ====== BEDROCK PING ======
 async function getServerData() {
     try {
         const res = await bedrock.ping({
@@ -49,11 +44,11 @@ async function getServerData() {
 
         return {
             online: true,
-            players: res.playersOnline || 0,
-            max: res.playersMax || 0
+            players: res.playersOnline ?? 0,
+            max: res.playersMax ?? 0
         };
 
-    } catch (e) {
+    } catch (err) {
         return {
             online: false,
             players: 0,
@@ -62,12 +57,15 @@ async function getServerData() {
     }
 }
 
-// ====== UPDATE CHANNEL ======
+// ====== UPDATE CHANNEL NAME ======
 async function updateServer() {
+    if (isUpdating) return;
+    isUpdating = true;
+
     try {
         const data = await getServerData();
 
-        const channel = await client.channels.fetch(CHANNEL_ID);
+        const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
 
         if (!channel) {
             console.log('❌ Channel not found');
@@ -77,29 +75,24 @@ async function updateServer() {
         let newName;
 
         if (data.online) {
-            newName = `🟢 Online: ${data.players}/${data.max}`;
+            newName = `🟢 Online ${data.players}/${data.max}`;
         } else {
-            newName = `🔴 Server Offline`;
+            newName = `🔴 Offline`;
         }
 
-        // ====== ANTI-SPAM ======
         if (newName !== lastName) {
             await channel.setName(newName);
             lastName = newName;
 
-            console.log(`✅ Updated channel: ${newName}`);
+            console.log(`✅ Updated: ${newName}`);
         }
 
     } catch (err) {
-        console.log('❌ Error updating server:', err.message);
+        console.log('❌ Update error:', err.message);
+    } finally {
+        isUpdating = false;
     }
 }
 
-// ====== START BOT ======
-if (!TOKEN) {
-    console.log('❌ TOKEN not found in .env');
-    process.exit(1);
-}
-
-client.login(TOKEN);
+// ====== LOGIN ======
 client.login(TOKEN);
