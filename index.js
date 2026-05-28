@@ -6,11 +6,11 @@ const app = express();
 const { Client, GatewayIntentBits } = require('discord.js');
 const bedrock = require('bedrock-protocol');
 
-// ===== WEB SERVER FOR RENDER =====
+// ===== WEB SERVER =====
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('SMP Bot is running');
+    res.send('Bot is running');
 });
 
 app.listen(PORT, () => {
@@ -19,6 +19,8 @@ app.listen(PORT, () => {
 
 // ===== TOKEN =====
 const TOKEN = process.env.TOKEN;
+
+console.log('TOKEN EXISTS:', !!TOKEN);
 
 if (!TOKEN) {
     console.log('❌ TOKEN not found');
@@ -30,87 +32,23 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ===== SETTINGS =====
-const CHANNEL_ID = '1509520035197222953';
-const SERVER_IP = '95.217.59.237';
-const SERVER_PORT = 10900;
-
-// ===== CACHE =====
-let lastName = '';
-let isUpdating = false;
-
-// ===== READY =====
-client.once('clientReady', () => {
+client.on('ready', () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
-
-    updateServer();
-
-    setInterval(updateServer, 30000);
 });
 
-// ===== BEDROCK PING =====
-async function getServerData() {
-    try {
-        const res = await bedrock.ping({
-            host: SERVER_IP,
-            port: SERVER_PORT
-        });
+client.on('error', (err) => {
+    console.log('❌ Discord error:', err);
+});
 
-        return {
-            online: true,
-            players: res.playersOnline ?? 0,
-            max: res.playersMax ?? 0
-        };
-
-    } catch (err) {
-        return {
-            online: false,
-            players: 0,
-            max: 0
-        };
-    }
-}
-
-// ===== UPDATE CHANNEL =====
-async function updateServer() {
-
-    if (isUpdating) return;
-
-    isUpdating = true;
-
-    try {
-
-        const data = await getServerData();
-
-        const channel = await client.channels.fetch(CHANNEL_ID);
-
-        if (!channel) {
-            console.log('❌ Channel not found');
-            return;
-        }
-
-        const newName = data.online
-            ? `🟢 Online ${data.players}/${data.max}`
-            : `🔴 Offline`;
-
-        if (newName !== lastName) {
-
-            await channel.setName(newName);
-
-            lastName = newName;
-
-            console.log(`✅ Updated: ${newName}`);
-        }
-
-    } catch (err) {
-
-        console.log('❌ Update error:', err.message);
-
-    } finally {
-
-        isUpdating = false;
-    }
-}
+client.on('shardError', (err) => {
+    console.log('❌ Shard error:', err);
+});
 
 // ===== LOGIN =====
-client.login(TOKEN);
+client.login(TOKEN)
+    .then(() => {
+        console.log('✅ Login successful');
+    })
+    .catch((err) => {
+        console.log('❌ LOGIN FAILED:', err.message);
+    });
