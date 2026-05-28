@@ -1,7 +1,19 @@
 require('dotenv').config();
 
+const express = require('express');
+const app = express();
+
 const { Client, GatewayIntentBits } = require('discord.js');
 const bedrock = require('bedrock-protocol');
+
+// ====== KEEP RENDER ALIVE (FIX WEB SERVICE WARNING) ======
+app.get('/', (req, res) => {
+    res.send('Bot is running');
+});
+
+app.listen(process.env.PORT || 3000, () => {
+    console.log('🌐 Web server started');
+});
 
 // ====== TOKEN ======
 const TOKEN = process.env.TOKEN;
@@ -73,7 +85,6 @@ async function updateServer() {
         // ====== ANTI-SPAM ======
         if (newName !== lastName) {
             await channel.setName(newName);
-
             lastName = newName;
 
             console.log(`✅ Updated channel: ${newName}`);
@@ -90,4 +101,5 @@ if (!TOKEN) {
     process.exit(1);
 }
 
+client.login(TOKEN);
 client.login(TOKEN);
