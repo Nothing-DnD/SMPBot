@@ -50,5 +50,4 @@ client.login(TOKEN)
         console.log('✅ Login successful');
     })
     .catch((err) => {
-        console.log('❌ LOGIN FAILED:', err.message);
-    });
+        console.log('❌ LOGIN FAILED:', err
