@@ -1,26 +1,33 @@
 require('dotenv').config();
+
 const { Client, GatewayIntentBits } = require('discord.js');
 const bedrock = require('bedrock-protocol');
 
+// ====== TOKEN ======
+const TOKEN = process.env.TOKEN;
+
+// ====== DISCORD CLIENT ======
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ====== НАСТРОЙКИ ======
+// ====== SETTINGS ======
 const CHANNEL_ID = '1509520035197222953';
 const SERVER_IP = '95.217.59.237';
 const SERVER_PORT = 10900;
 
-// ====== КЕШ (чтобы не спамить API) ======
+// ====== CACHE ======
 let lastName = '';
 
+// ====== BOT READY ======
 client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}`);
+    console.log(`✅ Logged in as ${client.user.tag}`);
 
     updateServer();
-    setInterval(updateServer, 30000); // каждые 30 сек
+    setInterval(updateServer, 30000);
 });
 
+// ====== GET SERVER STATUS ======
 async function getServerData() {
     try {
         const res = await bedrock.ping({
@@ -43,11 +50,17 @@ async function getServerData() {
     }
 }
 
+// ====== UPDATE CHANNEL ======
 async function updateServer() {
     try {
         const data = await getServerData();
 
         const channel = await client.channels.fetch(CHANNEL_ID);
+
+        if (!channel) {
+            console.log('❌ Channel not found');
+            return;
+        }
 
         let newName;
 
@@ -57,16 +70,24 @@ async function updateServer() {
             newName = `🔴 Server Offline`;
         }
 
-        // защита от лишних обновлений
+        // ====== ANTI-SPAM ======
         if (newName !== lastName) {
             await channel.setName(newName);
+
             lastName = newName;
-            console.log('Updated:', newName);
+
+            console.log(`✅ Updated channel: ${newName}`);
         }
 
     } catch (err) {
-        console.log('Error updating server:', err.message);
+        console.log('❌ Error updating server:', err.message);
     }
+}
+
+// ====== START BOT ======
+if (!TOKEN) {
+    console.log('❌ TOKEN not found in .env');
+    process.exit(1);
 }
 
 client.login(TOKEN);
