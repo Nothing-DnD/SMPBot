@@ -1,130 +1,105 @@
 require('dotenv').config();
 
 const express = require('express');
-const app = express();
-
 const { Client, GatewayIntentBits } = require('discord.js');
 const bedrock = require('bedrock-protocol');
 
-// ====== RENDER WEB SERVER ======
-const PORT = process.env.PORT || 3000;
+// ===== EXPRESS =====
+const app = express();
 
 app.get('/', (req, res) => {
-    res.send('SMP Bot is running');
+    res.send('Bot is alive');
 });
+
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
     console.log(`🌐 Web server running on port ${PORT}`);
 });
 
-// ====== TOKEN ======
-const TOKEN = process.env.TOKEN;
-
-console.log('TOKEN EXISTS:', !!TOKEN);
-
-if (!TOKEN) {
-    console.log('❌ TOKEN not found');
-    process.exit(1);
-}
-
-// ====== DISCORD CLIENT ======
+// ===== DISCORD =====
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ====== SETTINGS ======
+// ===== CONFIG =====
+const TOKEN = process.env.TOKEN;
+
 const CHANNEL_ID = '1509520035197222953';
+
 const SERVER_IP = '95.217.59.237';
 const SERVER_PORT = 10900;
 
-// ====== STATE ======
+// ===== CACHE =====
 let lastName = '';
-let isUpdating = false;
 
-// ====== READY EVENT (FIXED) ======
+// ===== READY =====
 client.once('ready', () => {
+
     console.log(`✅ Logged in as ${client.user.tag}`);
 
-    updateServer();
-    setInterval(updateServer, 30000);
+    updateChannel();
+
+    setInterval(updateChannel, 30000);
 });
 
-// ====== ERROR HANDLERS ======
-client.on('error', (err) => {
-    console.log('❌ Discord error:', err.message);
-});
+// ===== UPDATE CHANNEL =====
+async function updateChannel() {
 
-client.on('shardError', (err) => {
-    console.log('❌ Shard error:', err.message);
-});
-
-// ====== BEDROCK PING ======
-async function getServerData() {
     try {
+
+        const channel = await client.channels.fetch(CHANNEL_ID);
+
+        if (!channel) return;
+
         const res = await bedrock.ping({
             host: SERVER_IP,
             port: SERVER_PORT
         });
 
-        return {
-            online: true,
-            players: res.playersOnline ?? 0,
-            max: res.playersMax ?? 0
-        };
+        const players = res.playersOnline || 0;
+        const max = res.playersMax || 0;
 
-    } catch (err) {
-        console.log('⚠️ Ping failed:', err.message);
-
-        return {
-            online: false,
-            players: 0,
-            max: 0
-        };
-    }
-}
-
-// ====== UPDATE CHANNEL ======
-async function updateServer() {
-    if (isUpdating) return;
-
-    isUpdating = true;
-
-    try {
-        const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
-
-        if (!channel) {
-            console.log('❌ Channel not found');
-            return;
-        }
-
-        const data = await getServerData();
-
-        const newName = data.online
-            ? `🟢 Online ${data.players}/${data.max}`
-            : `🔴 Offline`;
+        const newName = `🟢 Online ${players}/${max}`;
 
         if (newName !== lastName) {
+
             await channel.setName(newName);
+
             lastName = newName;
 
             console.log(`✅ Updated: ${newName}`);
         }
 
     } catch (err) {
-        console.log('❌ Update error:', err.message);
 
-    } finally {
-        isUpdating = false;
+        console.log('⚠️ Server offline');
+
+        try {
+
+            const channel = await client.channels.fetch(CHANNEL_ID);
+
+            const offlineName = '🔴 Offline';
+
+            if (offlineName !== lastName) {
+
+                await channel.setName(offlineName);
+
+                lastName = offlineName;
+
+                console.log('✅ Updated: Offline');
+            }
+
+        } catch {}
+
     }
 }
 
-// ====== LOGIN (FIXED) ======
-console.log('🚀 Starting Discord login...');
-
+// ===== LOGIN =====
 client.login(TOKEN)
     .then(() => {
-        console.log('✅ Discord login successful');
+        console.log('✅ Discord connected');
     })
     .catch((err) => {
-        console.log('❌ LOGIN FAILED:', err.message);
+        console.log('❌ Login failed:', err.message);
     });
